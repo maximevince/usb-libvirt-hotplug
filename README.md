@@ -18,16 +18,20 @@ chmod +x /opt/usb-libvirt-hotplug/usb-libvirt-hotplug.sh
 
 Once the script is in place, we can add a udev rule for it.
 Create a udev rules-file in `/etc/udev/rules.d`, e.g.: `/etc/udev/rules.d/90-usb-libvirt-hotplug.rules`
+Or, for Synology in `/lib/udev/rules.d/90-usb-libvirt-hotplug.rules`
 
 This file must contain a udev rule that matches the device insertion and removals.
 
 It will typically look something like:
 
 ```
+# using DEVPATH
+# Here we attach any USB device plugged into the USB port identified by `/devices/pci0000:00/0000:00:1a.0/usb1/1-1/1-1.2` to the VM `testvm-01`.
 SUBSYSTEM=="usb",DEVPATH=="/devices/pci0000:00/0000:00:1a.0/usb1/1-1/1-1.2",RUN+="/opt/usb-libvirt-hotplug/usb-libvirt-hotplug.sh testvm-01"
+#
+# using ID_MODEL_ID and ID_VENDOR_ID, and a different VM id
+SUBSYSTEM=="usb",ENV{ID_MODEL_ID}=="8001",ENV{ID_VENDOR_ID}=="2cc1",RUN+="/opt/usb-libvirt-hotplug/usb-libvirt-hotplug.sh 786802d8-d132-4771-a0bb-9d0ab4ca8cc5"
 ```
-
-Here we attach any USB device plugged into the USB port identified by `/devices/pci0000:00/0000:00:1a.0/usb1/1-1/1-1.2` to the VM `testvm-01`.
 
 *Note*:
 The script has one mandatory parameter, which contains the libvirt domain that the script should attach the device to.
@@ -51,7 +55,7 @@ After the udev rule file has been saved, you will probably need to ask udev to r
 E.g.:
 
 ```
-$ sudo service udev reload
+$ sudo udevadm control --reload-rules && udevadm trigger
 ```
 
 
@@ -113,6 +117,12 @@ $ virsh qemu-monitor-command testvm-01 --hmp 'info usb'
   Device 0.12, Port 2.3, Speed 12 Mb/s, Product USB to ATA/ATAPI bridge
 ```
 
+To determine if you are referring to the correct VM, it's often useful to look at the network MAC address:
+```
+$ virsh qemu-monitor-command testvm-01 --hmp 'info network'
+  net0: index=0,type=nic,model=virtio-net-pci,macaddr=02:11:32:25:9e:a8
+   \ hostnet0: index=0,type=tap,ifname=tap021132259ea8,script=no,downscript=/etc/qemu-ifdown
+```
 
 ### Manually detaching USB devices
 
